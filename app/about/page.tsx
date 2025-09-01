@@ -1,4 +1,4 @@
-import { Navbar } from "@/components/navbar"
+import Navbar from "@/components/navbar"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { BookOpen, Users, Target, Heart, Award, Globe } from "lucide-react"
 
