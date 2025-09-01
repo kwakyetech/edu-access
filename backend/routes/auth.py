@@ -68,9 +68,9 @@ def register():
         db.session.add(user)
         db.session.commit()
         
-        # Create access token
+        # Create access token without CSRF
         access_token = create_access_token(
-            identity=user.id,
+            identity=str(user.id),  # Convert to string for JWT compatibility
             expires_delta=timedelta(hours=24)
         )
         
@@ -101,9 +101,9 @@ def login():
         if not user or not user.check_password(password):
             return jsonify({'error': 'Invalid email or password'}), 401
         
-        # Create access token
+        # Create access token without CSRF
         access_token = create_access_token(
-            identity=user.id,
+            identity=str(user.id),  # Convert to string for JWT compatibility
             expires_delta=timedelta(hours=24)
         )
         
@@ -120,7 +120,7 @@ def login():
 @jwt_required()
 def get_profile():
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())  # Convert string back to int
         user = User.query.get(user_id)
         
         if not user:
@@ -135,7 +135,7 @@ def get_profile():
 @jwt_required()
 def update_profile():
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())  # Convert string back to int
         user = User.query.get(user_id)
         
         if not user:
@@ -171,7 +171,7 @@ def update_profile():
 @jwt_required()
 def change_password():
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())  # Convert string back to int
         user = User.query.get(user_id)
         
         if not user:

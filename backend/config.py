@@ -15,6 +15,9 @@ class Config:
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or 'jwt-secret-key-change-in-production'
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=1)
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=30)
+    JWT_CSRF_PROTECT = False  # Disable CSRF protection for API endpoints
+    JWT_CSRF_IN_COOKIES = False  # Disable CSRF tokens in cookies
+    JWT_TOKEN_LOCATION = ['headers']  # Only use Authorization header
     
     # Database Configuration
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
@@ -60,6 +63,7 @@ class DevelopmentConfig(Config):
     """Development configuration."""
     DEBUG = True
     SQLALCHEMY_ECHO = True
+    JWT_CSRF_PROTECT = False  # Ensure CSRF is disabled in development
 
 class ProductionConfig(Config):
     """Production configuration."""

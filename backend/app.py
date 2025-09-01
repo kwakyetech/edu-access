@@ -30,6 +30,19 @@ def create_app(config_name=None):
     jwt.init_app(app)
     cors.init_app(app, origins=app.config['CORS_ORIGINS'])
     
+    # JWT error handlers
+    @jwt.expired_token_loader
+    def expired_token_callback(jwt_header, jwt_payload):
+        return jsonify({'error': 'Token has expired'}), 401
+    
+    @jwt.invalid_token_loader
+    def invalid_token_callback(error):
+        return jsonify({'error': 'Invalid token'}), 401
+    
+    @jwt.unauthorized_loader
+    def missing_token_callback(error):
+        return jsonify({'error': 'Authorization token is required'}), 401
+    
     # Register blueprints
     from routes.auth import auth_bp
     from routes.notes import notes_bp
@@ -37,6 +50,7 @@ def create_app(config_name=None):
     from routes.past_questions import past_questions_bp
     from routes.leaderboard import leaderboard_bp
     from routes.dashboard import dashboard_bp
+    from routes.files import files_bp
     
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(notes_bp, url_prefix='/api/notes')
@@ -44,6 +58,7 @@ def create_app(config_name=None):
     app.register_blueprint(past_questions_bp, url_prefix='/api/past-questions')
     app.register_blueprint(leaderboard_bp, url_prefix='/api/leaderboard')
     app.register_blueprint(dashboard_bp, url_prefix='/api/dashboard')
+    app.register_blueprint(files_bp, url_prefix='/api/files')
     
     # Health check endpoint
     @app.route('/api/health', methods=['GET'])
