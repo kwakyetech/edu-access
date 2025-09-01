@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { BookOpen, Menu, X, Home, Upload, FileText, Trophy, Info, LogOut } from "lucide-react"
+import { BookOpen, Menu, X, LogOut } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 
@@ -11,11 +11,11 @@ export default function Navbar() {
   const router = useRouter()
 
   const navItems = [
-    { href: "/dashboard", label: "Home", icon: Home },
-    { href: "/upload", label: "Upload Notes", icon: Upload },
-    { href: "/past-questions", label: "Past Questions", icon: FileText },
-    { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
-    { href: "/about", label: "About", icon: Info },
+    { href: "/dashboard", label: "Home" },
+    { href: "/upload", label: "Upload Notes" },
+    { href: "/past-questions", label: "Past Questions" },
+    { href: "/leaderboard", label: "Leaderboard" },
+    { href: "/about", label: "About" },
   ]
 
   const handleLogout = () => {
@@ -43,9 +43,8 @@ export default function Navbar() {
               <Link
                 key={item.href}
                 href={item.href}
-                className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+                className="text-muted-foreground hover:text-foreground transition-colors"
               >
-                <item.icon className="w-4 h-4" />
                 {item.label}
               </Link>
             ))}
@@ -74,10 +73,9 @@ export default function Navbar() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="flex items-center gap-3 text-muted-foreground hover:text-foreground transition-colors py-2"
+                  className="text-muted-foreground hover:text-foreground transition-colors py-2"
                   onClick={() => setIsMenuOpen(false)}
                 >
-                  <item.icon className="w-5 h-5" />
                   {item.label}
                 </Link>
               ))}
