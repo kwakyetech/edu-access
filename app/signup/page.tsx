@@ -50,7 +50,16 @@ export default function SignUpPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4 py-8">
+    <div className="min-h-screen bg-background flex items-center justify-center px-4 py-8 relative">
+      {/* Back to Home Link */}
+      <Link 
+        href="/" 
+        className="absolute top-4 left-4 flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <BookOpen className="w-5 h-5" />
+        <span className="text-sm font-medium">Back to Home</span>
+      </Link>
+      
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
@@ -200,12 +209,7 @@ export default function SignUpPage() {
           </CardContent>
         </Card>
 
-        {/* Back to Home */}
-        <div className="mt-6 text-center">
-          <Link href="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-            ← Back to Home
-          </Link>
-        </div>
+
       </div>
     </div>
   )
