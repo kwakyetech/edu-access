@@ -19,13 +19,13 @@ class Config:
     JWT_CSRF_IN_COOKIES = False  # Disable CSRF tokens in cookies
     JWT_TOKEN_LOCATION = ['headers']  # Only use Authorization header
     
-    # Database Configuration
+    # Database Configuration (Supabase PostgreSQL)
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-        f"mysql+pymysql://{os.environ.get('DB_USER', 'root')}:" \
+        f"postgresql://{os.environ.get('DB_USER', 'postgres')}:" \
         f"{os.environ.get('DB_PASSWORD', 'password')}@" \
         f"{os.environ.get('DB_HOST', 'localhost')}:" \
-        f"{os.environ.get('DB_PORT', '3306')}/" \
-        f"{os.environ.get('DB_NAME', 'eduaccess')}"
+        f"{os.environ.get('DB_PORT', '5432')}/" \
+        f"{os.environ.get('DB_NAME', 'postgres')}"
     
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {

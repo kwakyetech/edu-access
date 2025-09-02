@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import Leaderboard, User, QuizAttempt, Note, db
+from security import limiter
 from sqlalchemy import func, desc
 
 leaderboard_bp = Blueprint('leaderboard', __name__)
@@ -63,6 +64,7 @@ def update_all_ranks():
         print(f"Error updating ranks: {e}")
 
 @leaderboard_bp.route('/', methods=['GET'])
+@limiter.limit("100 per hour")
 def get_leaderboard():
     try:
         page = request.args.get('page', 1, type=int)
@@ -95,6 +97,7 @@ def get_leaderboard():
         return jsonify({'error': 'Failed to get leaderboard', 'details': str(e)}), 500
 
 @leaderboard_bp.route('/top/<int:limit>', methods=['GET'])
+@limiter.limit("100 per hour")
 def get_top_users(limit):
     try:
         # Limit the number of top users (max 50)
@@ -122,6 +125,7 @@ def get_top_users(limit):
         return jsonify({'error': 'Failed to get top users', 'details': str(e)}), 500
 
 @leaderboard_bp.route('/user/<int:user_id>', methods=['GET'])
+@limiter.limit("100 per hour")
 def get_user_rank(user_id):
     try:
         # Update user stats
@@ -143,9 +147,10 @@ def get_user_rank(user_id):
 
 @leaderboard_bp.route('/my-rank', methods=['GET'])
 @jwt_required()
+@limiter.limit("100 per hour")
 def get_my_rank():
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         
         # Update user stats
         update_user_leaderboard_stats(user_id)

@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import Quiz, QuizAttempt, User, Note, db
 from transformers import pipeline
+from security import limiter, require_json, validate_request_data, InputValidator, log_security_event
 import json
 import re
 import random
@@ -154,15 +155,21 @@ def generate_fallback_questions(text, num_questions=5):
 
 @quiz_bp.route('/generate', methods=['POST'])
 @jwt_required()
+@limiter.limit("10 per hour")
+@require_json
+@validate_request_data(
+    required_fields=['content'],
+    validators={
+        'subject': InputValidator.validate_subject
+    }
+)
 def generate_quiz():
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         data = request.get_json()
         
-        if not data.get('content'):
-            return jsonify({'error': 'Content is required for quiz generation'}), 400
-        
-        content = data['content']
+        # Extract validated data
+        content = data['content'].strip()
         title = data.get('title', 'Generated Quiz')
         subject = data.get('subject', 'General')
         difficulty = data.get('difficulty', 'medium')
@@ -186,6 +193,13 @@ def generate_quiz():
         db.session.add(quiz)
         db.session.commit()
         
+        # Log quiz generation
+        log_security_event('quiz_generated', {
+            'user_id': user_id,
+            'quiz_id': quiz.id,
+            'num_questions': len(questions)
+        })
+        
         # Award points for creating a quiz
         user = User.query.get(user_id)
         if user:
@@ -205,7 +219,7 @@ def generate_quiz():
 @jwt_required()
 def generate_quiz_from_note(note_id):
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         note = Note.query.filter_by(id=note_id, user_id=user_id).first()
         
         if not note:
@@ -252,7 +266,7 @@ def generate_quiz_from_note(note_id):
 @jwt_required()
 def get_quizzes():
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 10, type=int)
         subject = request.args.get('subject')
@@ -290,7 +304,7 @@ def get_quizzes():
 @jwt_required()
 def get_quiz(quiz_id):
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         quiz = Quiz.query.filter_by(id=quiz_id, created_by=user_id).first()
         
         if not quiz:
@@ -303,9 +317,11 @@ def get_quiz(quiz_id):
 
 @quiz_bp.route('/<int:quiz_id>/attempt', methods=['POST'])
 @jwt_required()
+@limiter.limit("50 per hour")
+@require_json
 def submit_quiz_attempt(quiz_id):
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         quiz = Quiz.query.get(quiz_id)
         
         if not quiz:
@@ -313,8 +329,9 @@ def submit_quiz_attempt(quiz_id):
         
         data = request.get_json()
         
-        if not data.get('answers'):
-            return jsonify({'error': 'Answers are required'}), 400
+        # Extract answers from request
+        if 'answers' not in data:
+            return jsonify({'error': 'answers is required'}), 400
         
         answers = data['answers']
         time_taken = data.get('time_taken', 0)
@@ -351,6 +368,14 @@ def submit_quiz_attempt(quiz_id):
         
         db.session.commit()
         
+        # Log quiz attempt
+        log_security_event('quiz_attempted', {
+            'user_id': user_id,
+            'quiz_id': quiz_id,
+            'score': score,
+            'total_questions': total_questions
+        })
+        
         return jsonify({
             'message': 'Quiz attempt submitted successfully',
             'attempt': attempt.to_dict(),
@@ -365,7 +390,7 @@ def submit_quiz_attempt(quiz_id):
 @jwt_required()
 def get_quiz_attempts():
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 10, type=int)
         

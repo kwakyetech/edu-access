@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import User, Note, Quiz, QuizAttempt, PastQuestion, Leaderboard, db
+from models import db, User, Quiz, QuizAttempt, Note, PastQuestion
+from security import limiter
 from sqlalchemy import func, desc
 from datetime import datetime, timedelta
 
@@ -8,9 +9,10 @@ dashboard_bp = Blueprint('dashboard', __name__)
 
 @dashboard_bp.route('/overview', methods=['GET'])
 @jwt_required()
+@limiter.limit("100 per hour")
 def get_dashboard_overview():
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         user = User.query.get(user_id)
         
         if not user:
@@ -77,9 +79,10 @@ def get_dashboard_overview():
 
 @dashboard_bp.route('/activity', methods=['GET'])
 @jwt_required()
+@limiter.limit("100 per hour")
 def get_activity_timeline():
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         days = request.args.get('days', 30, type=int)
         
         # Limit days to reasonable range
@@ -131,9 +134,10 @@ def get_activity_timeline():
 
 @dashboard_bp.route('/quiz-performance', methods=['GET'])
 @jwt_required()
+@limiter.limit("100 per hour")
 def get_quiz_performance():
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         
         # Get all quiz attempts
         attempts = QuizAttempt.query.filter_by(user_id=user_id)\
@@ -206,9 +210,10 @@ def get_quiz_performance():
 
 @dashboard_bp.route('/notes-analytics', methods=['GET'])
 @jwt_required()
+@limiter.limit("100 per hour")
 def get_notes_analytics():
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         
         # Get all notes
         notes = Note.query.filter_by(user_id=user_id).all()
@@ -278,9 +283,10 @@ def get_notes_analytics():
 
 @dashboard_bp.route('/achievements', methods=['GET'])
 @jwt_required()
+@limiter.limit("100 per hour")
 def get_achievements():
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         user = User.query.get(user_id)
         
         if not user:
@@ -377,9 +383,10 @@ def get_achievements():
 
 @dashboard_bp.route('/goals', methods=['GET'])
 @jwt_required()
+@limiter.limit("100 per hour")
 def get_goals():
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         user = User.query.get(user_id)
         
         if not user:

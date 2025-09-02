@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from models import User, db
+from security import limiter, require_json, validate_request_data, InputValidator, log_security_event
 from datetime import timedelta
 import re
 
@@ -23,15 +24,19 @@ def validate_password(password):
     return True
 
 @auth_bp.route('/register', methods=['POST'])
+@limiter.limit("5 per minute")
+@require_json
+@validate_request_data(
+    required_fields=['username', 'email', 'password', 'first_name', 'last_name'],
+    validators={
+        'username': InputValidator.validate_username,
+        'email': InputValidator.validate_email,
+        'password': InputValidator.validate_password
+    }
+)
 def register():
     try:
         data = request.get_json()
-        
-        # Validate required fields
-        required_fields = ['username', 'email', 'password', 'first_name', 'last_name']
-        for field in required_fields:
-            if not data.get(field):
-                return jsonify({'error': f'{field} is required'}), 400
         
         username = data['username'].strip()
         email = data['email'].strip().lower()
@@ -39,21 +44,13 @@ def register():
         first_name = data['first_name'].strip()
         last_name = data['last_name'].strip()
         
-        # Validate email format
-        if not validate_email(email):
-            return jsonify({'error': 'Invalid email format'}), 400
-        
-        # Validate password strength
-        if not validate_password(password):
-            return jsonify({
-                'error': 'Password must be at least 8 characters long and contain uppercase, lowercase, and digit'
-            }), 400
-        
         # Check if user already exists
         if User.query.filter_by(username=username).first():
+            log_security_event('registration_attempt', {'reason': 'username_exists', 'username': username})
             return jsonify({'error': 'Username already exists'}), 400
         
         if User.query.filter_by(email=email).first():
+            log_security_event('registration_attempt', {'reason': 'email_exists', 'email': email})
             return jsonify({'error': 'Email already registered'}), 400
         
         # Create new user
@@ -67,6 +64,8 @@ def register():
         
         db.session.add(user)
         db.session.commit()
+        
+        log_security_event('user_registered', {'user_id': user.id, 'username': username})
         
         # Create access token without CSRF
         access_token = create_access_token(
@@ -85,12 +84,17 @@ def register():
         return jsonify({'error': 'Registration failed', 'details': str(e)}), 500
 
 @auth_bp.route('/login', methods=['POST'])
+@limiter.limit("10 per minute")
+@require_json
+@validate_request_data(
+    required_fields=['email', 'password'],
+    validators={
+        'email': InputValidator.validate_email
+    }
+)
 def login():
     try:
         data = request.get_json()
-        
-        if not data.get('email') or not data.get('password'):
-            return jsonify({'error': 'Email and password are required'}), 400
         
         email = data['email'].strip().lower()
         password = data['password']
@@ -99,6 +103,7 @@ def login():
         user = User.query.filter_by(email=email).first()
         
         if not user or not user.check_password(password):
+            log_security_event('login_failed', {'email': email, 'reason': 'invalid_credentials'})
             return jsonify({'error': 'Invalid email or password'}), 401
         
         # Create access token without CSRF
@@ -106,6 +111,8 @@ def login():
             identity=str(user.id),  # Convert to string for JWT compatibility
             expires_delta=timedelta(hours=24)
         )
+        
+        log_security_event('login_successful', {'user_id': user.id, 'username': user.username})
         
         return jsonify({
             'message': 'Login successful',

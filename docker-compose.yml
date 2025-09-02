@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  # Note: Database is now hosted on Supabase (PostgreSQL)
+  # No local database service needed
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: eduaccess_backend
+    restart: unless-stopped
+    environment:
+      - FLASK_ENV=production
+      - DATABASE_URL=postgresql://postgres:${SUPABASE_DB_PASSWORD}@${SUPABASE_DB_HOST}:5432/postgres
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-super-secret-jwt-key-change-in-production}
+      - SECRET_KEY=${SECRET_KEY:-your-super-secret-key-change-in-production}
+      - UPLOAD_FOLDER=/app/uploads
+      - MAX_CONTENT_LENGTH=16777216
+      - HUGGINGFACE_API_TOKEN=${HUGGINGFACE_API_TOKEN}
+      - CORS_ORIGINS=http://localhost:3000,http://frontend:3000
+    ports:
+      - "5000:5000"
+    volumes:
+      - backend_uploads:/app/uploads
+    # No database dependency since using Supabase
+    networks:
+      - eduaccess_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Frontend (React/Vite)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: eduaccess_frontend
+    restart: unless-stopped
+    environment:
+      - VITE_API_BASE_URL=http://localhost:5000/api
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - eduaccess_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Nginx Reverse Proxy (Optional)
+  nginx:
+    image: nginx:alpine
+    container_name: eduaccess_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - eduaccess_network
+
+volumes:
+  backend_uploads:
+    driver: local
+
+networks:
+  eduaccess_network:
+    driver: bridge

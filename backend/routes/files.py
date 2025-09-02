@@ -1,14 +1,16 @@
 from flask import Blueprint, request, jsonify, current_app, send_from_directory
 from flask_jwt_extended import jwt_required, get_jwt_identity
-import os
 from werkzeug.exceptions import RequestEntityTooLarge
-from utils import save_file, delete_file, allowed_file, format_response, format_error
-from models import db, User
+from models import User
+from utils import allowed_file, save_file, delete_file, format_response, format_error
+from security import limiter, check_file_security, InputSanitizer, log_security_event
+import os
 
 files_bp = Blueprint('files', __name__)
 
 @files_bp.route('/upload', methods=['POST'])
 @jwt_required()
+@limiter.limit("20 per hour")
 def upload_file():
     """Upload a file to the server."""
     try:
@@ -22,10 +24,16 @@ def upload_file():
         if file.filename == '':
             return format_error('No file selected', 400)
         
-        # Check file type
-        if not allowed_file(file.filename):
-            allowed_exts = ', '.join(current_app.config['ALLOWED_EXTENSIONS'])
-            return format_error(f'File type not allowed. Allowed types: {allowed_exts}', 400)
+        # Validate file upload
+        try:
+            safe_filename = check_file_security(file)
+        except Exception as e:
+            log_security_event('file_upload_rejected', {
+                'user_id': int(get_jwt_identity()),
+                'filename': file.filename,
+                'reason': str(e)
+            })
+            return format_error(str(e), 400)
         
         # Get current user
         current_user_id = int(get_jwt_identity())  # Convert string back to int
@@ -33,7 +41,9 @@ def upload_file():
         if not user:
             return format_error('User not found', 404)
         
-        # Save file
+        # Save file with sanitized filename
+        original_filename = file.filename
+        file.filename = InputSanitizer.sanitize_filename(file.filename)
         filename, file_path = save_file(file)
         
         if not filename:
@@ -43,10 +53,18 @@ def upload_file():
         file_size = os.path.getsize(file_path)
         file_type = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else 'unknown'
         
+        # Log successful upload
+        log_security_event('file_uploaded', {
+            'user_id': current_user_id,
+            'filename': filename,
+            'original_filename': original_filename,
+            'file_size': file_size
+        })
+        
         # Return file information
         file_info = {
             'filename': filename,
-            'original_filename': file.filename,
+            'original_filename': original_filename,
             'file_type': file_type,
             'file_size': file_size,
             'file_url': f'/api/files/download/{filename}',

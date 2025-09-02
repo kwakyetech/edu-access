@@ -4,6 +4,7 @@ from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 import os
 from config import config
+from security import init_security
 
 # Initialize extensions
 migrate = Migrate()
@@ -29,6 +30,9 @@ def create_app(config_name=None):
     migrate.init_app(app, db)
     jwt.init_app(app)
     cors.init_app(app, origins=app.config['CORS_ORIGINS'])
+    
+    # Initialize security features
+    limiter = init_security(app)
     
     # JWT error handlers
     @jwt.expired_token_loader
@@ -79,8 +83,3 @@ def create_app(config_name=None):
         return jsonify({'error': 'Internal server error'}), 500
     
     return app
-
-if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
-    app.run(debug=True, host='0.0.0.0', port=5000)

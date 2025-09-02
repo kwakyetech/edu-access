@@ -2,10 +2,12 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import PastQuestion, User, db
 from datetime import datetime
+from security import limiter, require_json, validate_request_data, InputValidator, log_security_event
 
 past_questions_bp = Blueprint('past_questions', __name__)
 
 @past_questions_bp.route('/', methods=['GET'])
+@limiter.limit("100 per hour")
 def get_past_questions():
     try:
         page = request.args.get('page', 1, type=int)
@@ -73,23 +75,28 @@ def get_past_question(question_id):
 
 @past_questions_bp.route('/', methods=['POST'])
 @jwt_required()
+@limiter.limit("10 per hour")
+@require_json
+@validate_request_data(
+    required_fields=['title', 'subject', 'year', 'exam_type'],
+    validators={
+        'year': InputValidator.validate_year,
+        'subject': InputValidator.validate_subject,
+        'exam_type': InputValidator.validate_exam_type
+    }
+)
 def upload_past_question():
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         data = request.get_json()
         
-        # Validate required fields
-        required_fields = ['title', 'subject', 'year', 'exam_type', 'file_url', 'file_type']
-        for field in required_fields:
-            if not data.get(field):
-                return jsonify({'error': f'{field} is required'}), 400
-        
+        # Extract validated data
         title = data['title'].strip()
         subject = data['subject'].strip()
-        year = int(data['year'])
+        year = data['year']
         exam_type = data['exam_type'].strip()
-        file_url = data['file_url']
-        file_type = data['file_type']
+        file_url = data.get('file_url', '')
+        file_type = data.get('file_type', 'PDF')
         
         # Validate year
         current_year = datetime.now().year
@@ -128,6 +135,14 @@ def upload_past_question():
             user.points += 25  # 25 points for uploading past question
             db.session.commit()
         
+        # Log successful upload
+        log_security_event('past_question_uploaded', {
+            'user_id': user_id,
+            'question_id': past_question.id,
+            'subject': subject,
+            'year': year
+        })
+        
         return jsonify({
             'message': 'Past question uploaded successfully',
             'past_question': past_question.to_dict()
@@ -143,7 +158,7 @@ def upload_past_question():
 @jwt_required()
 def update_past_question(question_id):
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         past_question = PastQuestion.query.filter_by(
             id=question_id, 
             uploaded_by=user_id
@@ -189,7 +204,7 @@ def update_past_question(question_id):
 @jwt_required()
 def delete_past_question(question_id):
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         past_question = PastQuestion.query.filter_by(
             id=question_id, 
             uploaded_by=user_id
@@ -208,12 +223,20 @@ def delete_past_question(question_id):
         return jsonify({'error': 'Failed to delete past question', 'details': str(e)}), 500
 
 @past_questions_bp.route('/<int:question_id>/download', methods=['POST'])
+@limiter.limit("50 per hour")
 def download_past_question(question_id):
     try:
         past_question = PastQuestion.query.get(question_id)
         
         if not past_question:
             return jsonify({'error': 'Past question not found'}), 404
+        
+        # Log download attempt
+        log_security_event('past_question_downloaded', {
+            'question_id': question_id,
+            'title': past_question.title,
+            'subject': past_question.subject
+        })
         
         # Increment download count
         past_question.download_count += 1
